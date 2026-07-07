@@ -1,0 +1,43 @@
+name: Build Windows EXE
+
+# Windows makineniz yoksa: bu depoyu GitHub'a push edin. Bu workflow
+# bulutta bir Windows makinesinde .exe uretir ve indirilebilir artifact
+# olarak yukler (Actions sekmesi > ilgili calisma > Artifacts).
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # Actions sekmesinden elle de tetiklenebilir
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bagimliliklari yukle
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Testleri calistir
+        run: python test_mekanizma.py
+
+      - name: .exe olustur (PyInstaller)
+        run: >
+          pyinstaller --onefile --windowed --name "RoketFirlatmaHesap"
+          --exclude-module matplotlib
+          --exclude-module tkinter
+          --exclude-module PyQt5
+          --exclude-module PyQt6
+          main.py
+
+      - name: EXE'yi artifact olarak yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoketFirlatmaHesap-windows
+          path: dist/RoketFirlatmaHesap.exe

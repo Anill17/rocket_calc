@@ -53,11 +53,12 @@ def hesapla_tek_nokta(alfa_deg: float, p: MekanizmaGirdileri) -> dict:
     Tx = p.KT * math.cos(aci)
     Ty = p.KT * math.sin(aci)
 
-    # BETA açısı (hareketli) — M noktasına göre T noktasının açısal konumu
+    # BETA açısı (hareketli) — M noktasına göre T noktasının açısal konumu.
+    # 180° zıt yönde ölçülür; böylece alfa=0'da ~132°'den başlar.
     BETA = math.degrees(
         math.atan2(
-            -Tx * (p.Mx - Tx) - Ty * (p.My - Ty),
-            -Tx * (p.My - Ty) + Ty * (p.Mx - Tx),
+            Tx * (p.Mx - Tx) + Ty * (p.My - Ty),
+            Tx * (p.My - Ty) - Ty * (p.Mx - Tx),
         )
     ) % 360
 
@@ -133,10 +134,11 @@ def hesapla_sweep(
     Tx = p.KT * np.cos(aci)
     Ty = p.KT * np.sin(aci)
 
+    # 180° zıt yönde ölçülür; alfa=0'da ~132°'den başlar (bkz. hesapla_tek_nokta)
     BETA = np.degrees(
         np.arctan2(
-            -Tx * (p.Mx - Tx) - Ty * (p.My - Ty),
-            -Tx * (p.My - Ty) + Ty * (p.Mx - Tx),
+            Tx * (p.Mx - Tx) + Ty * (p.My - Ty),
+            Tx * (p.My - Ty) - Ty * (p.Mx - Tx),
         )
     ) % 360
 
@@ -214,3 +216,43 @@ def hesapla_TM_referans(p: MekanizmaGirdileri) -> float:
     """TM (Yay Kolu uzunluğu, referans) = alfa=0 anındaki T-M mesafesi."""
     d = hesapla_tek_nokta(0.0, p)
     return math.sqrt((p.Mx - d["Tx"]) ** 2 + (p.My - d["Ty"]) ** 2)
+
+
+def bul_beta_180_noktasi(
+    p: MekanizmaGirdileri,
+    alfa_min: float = 0.0,
+    alfa_max: float = 60.5,
+    step: float = 0.5,
+) -> dict:
+    """BETA'nın 180°'ye ulaştığı (yay kuvvet kolu mesafesi = 0) noktayı bulur.
+
+    Ardışık örnekler arasında (BETA - 180) işaret değiştiriyorsa lineer
+    interpolasyonla tam ALFA bulunur ve o ALFA'da tek-nokta hesabı döndürülür.
+    Bu aralıkta 180°'ye ulaşılmıyorsa, 180°'ye en yakın örnek `ulasildi=False`
+    ile döndürülür.
+
+    Dönen sözlük tek-nokta çıktısına ek olarak `ulasildi` (bool) içerir.
+    """
+    sw = hesapla_sweep(p, alfa_min, alfa_max, step)
+    f = sw.BETA - 180.0
+
+    for i in range(len(f) - 1):
+        # mod-360 sıçramalarını (0/360 dolayında) yanlış kesişim saymamak için
+        if abs(sw.BETA[i] - sw.BETA[i + 1]) >= 90:
+            continue
+        if f[i] == 0.0:
+            d = hesapla_tek_nokta(float(sw.alfa_deg[i]), p)
+            d["ulasildi"] = True
+            return d
+        if f[i] * f[i + 1] < 0:
+            a0, a1 = float(sw.alfa_deg[i]), float(sw.alfa_deg[i + 1])
+            alfa = a0 - f[i] * (a1 - a0) / (f[i + 1] - f[i])
+            d = hesapla_tek_nokta(alfa, p)
+            d["ulasildi"] = True
+            return d
+
+    # Ulaşılmadı: 180°'ye en yakın örneği döndür
+    idx = int(np.argmin(np.abs(f)))
+    d = hesapla_tek_nokta(float(sw.alfa_deg[idx]), p)
+    d["ulasildi"] = False
+    return d

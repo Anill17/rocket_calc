@@ -7,8 +7,8 @@ Excel dosyasından birebir çevrilmiştir.
 
 ## Bölümler / Sekmeler
 
-- **Mekanizma Hesabı (Bölüm A):** Sabit girdiler, ALFA sweep tablosu, animasyonlu
-  mekanizma diyagramı (slider ile canlı) ve Net/Yay Kuvveti/Kalkış Mesafesi grafiği.
+- **Mekanizma Hesabı (Bölüm A):** Sabit girdiler, ALFA sweep sonuç tablosu ve
+  slider ile canlı animasyonlu mekanizma diyagramı.
 - **Yay Tasarımı (Bölüm B):** Basma yayı mekanik tasarım hesapları (k, Wahl faktörü,
   güvenli yük vb.). `k` ve `L_free` değerleri Bölüm A ve C'yi otomatik besler.
 - **Çalışma Noktaları (Bölüm C):** Yüklü boy → yük ve hedef yük → boy hesapları.
@@ -40,24 +40,29 @@ ALFA=0 için `net_kuvvet ≈ 151.20 N` (F_roket referansı 150 N ile uyumlu).
 
 ## Windows .exe Üretimi
 
-```bat
-build_exe.bat
-```
+> Not: `.exe` yalnızca **Windows üzerinde** üretilebilir (macOS/Linux'ta olmaz).
+> İki yol var:
 
-veya doğrudan:
+### Yol 1 — Windows makinesinde (en basit)
 
-```bat
-pyinstaller --onefile --windowed --name "RoketFirlatmaHesap" main.py
-```
+Proje klasörünü bir Windows makinesine kopyalayın ve `build_exe.bat` dosyasına
+çift tıklayın. Betik venv kurar, bağımlılıkları yükler ve `.exe` üretir.
+Çıktı: `dist/RoketFirlatmaHesap.exe` — Python kurulu olmayan Windows'ta da
+tek başına çalışır (`--windowed` konsol penceresini gizler).
 
-Çıktı: `dist/RoketFirlatmaHesap.exe`. `--windowed` konsol penceresini gizler;
-üretilen `.exe`, Python kurulu olmayan bir Windows makinesinde tek başına çalışır.
+### Yol 2 — Windows makineniz yoksa (GitHub Actions, bulutta)
+
+1. Bu klasörü bir GitHub deposuna push edin.
+2. `.github/workflows/build-windows.yml` otomatik çalışır (bulutta Windows).
+3. **Actions** sekmesi → ilgili çalışma → **Artifacts** altından
+   `RoketFirlatmaHesap-windows` dosyasını indirin — içinde hazır `.exe` vardır.
+4. Elle tetiklemek için: Actions → "Build Windows EXE" → "Run workflow".
 
 ## Merkezi Durum (AppState) ve Panel Bağımlılıkları
 
 Paneller bağımsız değildir; `core/app_state.py` içindeki **AppState** tek gerçek
 kaynaktır. `k` ve `L_free` computed property'dir. Bölüm B'de bir girdi değişince
-`spring_changed` sinyali yayınlanır; Bölüm A (sweep/grafik/AYRILDI) ve Bölüm C
+`spring_changed` sinyali yayınlanır; Bölüm A (sweep/tablo/AYRILDI) ve Bölüm C
 (yük/boy) buna abonedir ve **sekme kapalı olsa bile** arka planda güncellenir —
 sekmeler arası geçişte bayat veri görünmez. Bölüm A sabit girdileri için ayrıca
 `mechanism_changed` sinyali vardır.

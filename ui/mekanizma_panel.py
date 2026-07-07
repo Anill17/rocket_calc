@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from core.app_state import AppState
 from core.mekanizma_hesap import (
     AYRILMA_ESIGI,
+    bul_beta_180_noktasi,
     hesapla_sweep,
     hesapla_tek_nokta,
 )
@@ -41,7 +42,6 @@ GIRDI_TANIMLARI = [
     ("Mx — M noktası X", "Mx", -1000.0, 1000.0, 0.5),
     ("My — M noktası Y", "My", -1000.0, 1000.0, 0.5),
     ("F_roket — Roket kuvveti (N)", "F_roket", 0.0, 100000.0, 1.0),
-    ("KONTROL_ALFA (derece)", "KONTROL_ALFA", 0.0, 360.0, 0.5),
 ]
 
 # Tablo sütunları
@@ -50,6 +50,9 @@ TABLO_BASLIKLAR = [
     "BETA(°)",
     "Kalkış Mes.",
     "Füze Durumu",
+    "Tx",
+    "Ty",
+    "Anlık Yay Boyu",
     "Yay Kuvveti",
     "Yay Momenti",
     "Net Kuvvet",
@@ -107,16 +110,46 @@ class MekanizmaPanel(QWidget):
         self._anlik_grup = QGroupBox("Anlık Değerler (slider)")
         anlik_form = QFormLayout(self._anlik_grup)
         self._lbl_alfa = QLabel("-")
+        self._lbl_beta = QLabel("-")
         self._lbl_kalkis = QLabel("-")
         self._lbl_durum = QLabel("-")
+        self._lbl_yay_boyu = QLabel("-")
         self._lbl_yay_k = QLabel("-")
+        self._lbl_yay_moment = QLabel("-")
         self._lbl_net = QLabel("-")
+        self._lbl_solid = QLabel("-")
+        self._lbl_yay_kullanim = QLabel("-")
+        self._lbl_yay_kullanim.setWordWrap(True)
         anlik_form.addRow("ALFA (°):", self._lbl_alfa)
+        anlik_form.addRow("BETA (°):", self._lbl_beta)
         anlik_form.addRow("Kalkış Mesafesi:", self._lbl_kalkis)
         anlik_form.addRow("Füze Durumu:", self._lbl_durum)
+        anlik_form.addRow("Anlık Yay Boyu (mm):", self._lbl_yay_boyu)
         anlik_form.addRow("Yay Kuvveti (N):", self._lbl_yay_k)
+        anlik_form.addRow("Yay Momenti:", self._lbl_yay_moment)
         anlik_form.addRow("Net Kuvvet (N):", self._lbl_net)
+        anlik_form.addRow("Solid Height (mm):", self._lbl_solid)
+        anlik_form.addRow("Yay Durumu:", self._lbl_yay_kullanim)
+        # Füze ayrılma özeti (çubukların üstündeki bilgiyle aynı)
+        self._lbl_ayrilma = QLabel("-")
+        self._lbl_ayrilma.setWordWrap(True)
+        anlik_form.addRow(self._lbl_ayrilma)
         sol_layout.addWidget(self._anlik_grup)
+
+        # BETA = 180° noktası (yay kuvvet kolu mesafesi = 0) — sweep'e bağlı
+        self._beta180_grup = QGroupBox("BETA = 180° Noktası (moment kolu = 0)")
+        beta_form = QFormLayout(self._beta180_grup)
+        self._lbl_b180_alfa = QLabel("-")
+        self._lbl_b180_boy = QLabel("-")
+        self._lbl_b180_kuvvet = QLabel("-")
+        self._lbl_b180_not = QLabel("-")
+        self._lbl_b180_not.setWordWrap(True)
+        beta_form.addRow("ALFA (°):", self._lbl_b180_alfa)
+        beta_form.addRow("Anlık Yay Boyu (mm):", self._lbl_b180_boy)
+        beta_form.addRow("Yay Kuvveti (N):", self._lbl_b180_kuvvet)
+        beta_form.addRow(self._lbl_b180_not)
+        sol_layout.addWidget(self._beta180_grup)
+
         sol_layout.addStretch(1)
         splitter.addWidget(sol)
 
@@ -169,21 +202,46 @@ class MekanizmaPanel(QWidget):
         self.state.bildir_mekanizma_degisti()
 
     def yeniden_hesapla(self):
-        """Tüm sweep tablosunu, grafiği ve anlık paneli günceller."""
+        """Tüm sweep tablosunu, özetleri ve anlık paneli günceller."""
         sweep = hesapla_sweep(self.params, ALFA_MIN, ALFA_MAX, ALFA_STEP)
         self._son_sweep = sweep
         self._tabloyu_doldur(sweep)
 
         if sweep.ayrilma_alfa is not None:
-            self._ozet_etiket.setText(
+            ayrilma_metni = (
                 f"Füze ALFA = {sweep.ayrilma_alfa:g}°'de ayrılıyor "
                 f"(eşik {AYRILMA_ESIGI} mm)."
             )
         else:
-            self._ozet_etiket.setText(
+            ayrilma_metni = (
                 "Bu aralıkta füze ayrılmıyor (kalkış mesafesi eşiğe ulaşmıyor)."
             )
+        self._ozet_etiket.setText(ayrilma_metni)
+        # Aynı bilgiyi anlık değerler bölümünde de göster
+        self._lbl_ayrilma.setText(ayrilma_metni)
+
+        self._beta180_guncelle()
         self._slider_degisti()
+
+    def _beta180_guncelle(self):
+        """BETA = 180° (yay kuvvet kolu mesafesi = 0) noktasını gösterir."""
+        b = bul_beta_180_noktasi(self.params, ALFA_MIN, ALFA_MAX, ALFA_STEP)
+        self._lbl_b180_alfa.setText(f"{b['alfa_deg']:.2f}")
+        self._lbl_b180_boy.setText(f"{b['anlik_yay_boyu']:.3f}")
+        self._lbl_b180_kuvvet.setText(f"{b['yay_kuvveti']:.3f}")
+        if b["ulasildi"]:
+            self._lbl_b180_not.setText(
+                "✔ BETA bu ALFA aralığında 180°'ye ulaşıyor; yukarıdaki değerler "
+                "moment kolunun sıfırlandığı andaki değerlerdir."
+            )
+            self._lbl_b180_not.setStyleSheet("color: #2ecc71;")
+        else:
+            self._lbl_b180_not.setText(
+                f"ⓘ BETA bu ALFA aralığında 180°'ye ulaşmıyor "
+                f"(en yakın: BETA={b['BETA']:.1f}°). Yukarıdaki değerler "
+                "180°'ye en yakın noktaya aittir."
+            )
+            self._lbl_b180_not.setStyleSheet("color: #f1c40f;")
 
     def _tabloyu_doldur(self, sweep):
         satirlar = [
@@ -206,6 +264,9 @@ class MekanizmaPanel(QWidget):
                 f"{sweep.BETA[i]:.3f}",
                 f"{sweep.kalkis_mesafesi[i]:.3f}",
                 sweep.fuze_durumu[i],
+                f"{sweep.Tx[i]:.3f}",
+                f"{sweep.Ty[i]:.3f}",
+                f"{sweep.anlik_yay_boyu[i]:.3f}",
                 f"{sweep.yay_kuvveti[i]:.3f}",
                 f"{sweep.yay_momenti[i]:.3f}",
                 f"{sweep.net_kuvvet[i]:.3f}",
@@ -230,6 +291,7 @@ class MekanizmaPanel(QWidget):
         self._diyagram.guncelle(self.params, alfa, ayrildi)
 
         self._lbl_alfa.setText(f"{alfa:.1f}")
+        self._lbl_beta.setText(f"{d['BETA']:.3f}")
         self._lbl_kalkis.setText(f"{d['kalkis_mesafesi']:.3f}")
         self._lbl_durum.setText(d["fuze_durumu"])
         self._lbl_durum.setStyleSheet(
@@ -237,5 +299,25 @@ class MekanizmaPanel(QWidget):
             if ayrildi
             else "color: #2ecc71; font-weight: bold;"
         )
+        self._lbl_yay_boyu.setText(f"{d['anlik_yay_boyu']:.3f}")
         self._lbl_yay_k.setText(f"{d['yay_kuvveti']:.3f}")
+        self._lbl_yay_moment.setText(f"{d['yay_momenti']:.3f}")
         self._lbl_net.setText(f"{d['net_kuvvet']:.3f}")
+
+        # Solid Height ile karşılaştırma: anlık yay boyu solid height'ı
+        # kurtarıyorsa (>= ise) yay kullanılabilir.
+        Ls = self.state.yay_sonuclari.Ls
+        self._lbl_solid.setText(f"{Ls:.3f}")
+        anlik = d["anlik_yay_boyu"]
+        if anlik >= Ls:
+            self._lbl_yay_kullanim.setText(
+                f"✔ Yay KULLANILIR — anlık boy ({anlik:.2f} mm) solid height'ı "
+                f"({Ls:.2f} mm) kurtarıyor."
+            )
+            self._lbl_yay_kullanim.setStyleSheet("color: #2ecc71; font-weight: bold;")
+        else:
+            self._lbl_yay_kullanim.setText(
+                f"✖ Yay KULLANILMAZ — anlık boy ({anlik:.2f} mm) solid height'ın "
+                f"({Ls:.2f} mm) altında (yay tam sıkışmayı geçiyor)."
+            )
+            self._lbl_yay_kullanim.setStyleSheet("color: #e74c3c; font-weight: bold;")
