@@ -53,12 +53,13 @@ def hesapla_tek_nokta(alfa_deg: float, p: MekanizmaGirdileri) -> dict:
     Tx = p.KT * math.cos(aci)
     Ty = p.KT * math.sin(aci)
 
-    # BETA açısı (hareketli) — M noktasına göre T noktasının açısal konumu.
-    # 180° zıt yönde ölçülür; böylece alfa=0'da ~132°'den başlar.
+    # BETA açısı (hareketli) — K'ya göre T ve M vektörlerinin açısal ilişkisi.
+    # atan2(-cross, -dot): alfa=0'da ~138°'den başlar, alfa arttıkça ARTAR ve
+    # ~alfa 30.5°'de 180°'yi geçer (BETA=180 ⟺ K,T,M eşdoğrusal ⟺ moment kolu=0).
     BETA = math.degrees(
         math.atan2(
-            Tx * (p.Mx - Tx) + Ty * (p.My - Ty),
-            Tx * (p.My - Ty) - Ty * (p.Mx - Tx),
+            -Tx * (p.My - Ty) + Ty * (p.Mx - Tx),   # -cross (KT × TM)
+            -Tx * (p.Mx - Tx) - Ty * (p.My - Ty),   # -dot   (KT · TM)
         )
     ) % 360
 
@@ -134,11 +135,11 @@ def hesapla_sweep(
     Tx = p.KT * np.cos(aci)
     Ty = p.KT * np.sin(aci)
 
-    # 180° zıt yönde ölçülür; alfa=0'da ~132°'den başlar (bkz. hesapla_tek_nokta)
+    # atan2(-cross, -dot): alfa=0'da ~138°, alfa arttıkça artar (bkz. tek_nokta)
     BETA = np.degrees(
         np.arctan2(
-            Tx * (p.Mx - Tx) + Ty * (p.My - Ty),
-            Tx * (p.My - Ty) - Ty * (p.Mx - Tx),
+            -Tx * (p.My - Ty) + Ty * (p.Mx - Tx),   # -cross (KT × TM)
+            -Tx * (p.Mx - Tx) - Ty * (p.My - Ty),   # -dot   (KT · TM)
         )
     ) % 360
 

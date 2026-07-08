@@ -12,6 +12,7 @@ import math
 
 from core.mekanizma_hesap import (
     MekanizmaGirdileri,
+    bul_beta_180_noktasi,
     hesapla_geometri_noktalari,
     hesapla_sweep,
     hesapla_tek_nokta,
@@ -87,6 +88,29 @@ def test_ayrilma_esigi():
         d = hesapla_tek_nokta(alfa, p)
         beklenen = "AYRILDI" if d["kalkis_mesafesi"] >= 3.2 else "ITIYOR"
         assert d["fuze_durumu"] == beklenen
+
+
+def test_beta_alfa_ile_artar():
+    """BETA, ALFA arttıkça artmalı ve Excel'deki değerlerle uyuşmalı.
+
+    Excel ATAN2(x, y) -> Python math.atan2(y, x); argüman sırası doğru olmalı.
+    Varsayılan sabitlerle: ALFA=0 -> BETA≈138°, ALFA=60.5 -> BETA≈219.9°.
+    Yanlış argüman sırasında BETA ALFA ile azalır (yanlış).
+    """
+    p = MekanizmaGirdileri()
+    betalar = [hesapla_tek_nokta(a, p)["BETA"] for a in _alfa_araligi()]
+    for onceki, sonraki in zip(betalar, betalar[1:]):
+        assert sonraki > onceki, "BETA ALFA ile artmıyor (argüman sırası ters?)"
+    assert abs(betalar[0] - 138.0) < 0.5, f"ALFA=0 BETA={betalar[0]:.3f} != ~138"
+    assert abs(betalar[-1] - 219.9) < 0.5, f"ALFA=60.5 BETA={betalar[-1]:.3f} != ~219.9"
+
+
+def test_beta_180_kesisimi():
+    """BETA varsayılan sabitlerle 180°'yi (moment kolu=0) aralık içinde geçer."""
+    p = MekanizmaGirdileri()
+    b = bul_beta_180_noktasi(p)
+    assert b["ulasildi"], "BETA 180°'ye ulaşmıyor (argüman sırası ters olabilir)"
+    assert abs(b["BETA"] - 180.0) < 1e-6
 
 
 def _calistir():
