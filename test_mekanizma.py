@@ -114,13 +114,21 @@ def test_beta_180_kesisimi():
 
 
 def _calistir():
+    # Windows konsolu (cp1252) Unicode işaretleri kodlayamayabilir; UTF-8'e geç.
+    import sys
+
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
     testler = [v for k, v in globals().items() if k.startswith("test_")]
     basarili = 0
     for t in testler:
         t()
-        print(f"  ✓ {t.__name__}")
+        print(f"  [OK] {t.__name__}")
         basarili += 1
-    print(f"\n{basarili}/{len(testler)} test GEÇTİ")
+    print(f"\n{basarili}/{len(testler)} test GECTI")
     return 0
 
 
